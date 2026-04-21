@@ -74,9 +74,8 @@ POST /v1/responses
 
 ```bash
 git clone git@github.com:basketikun/chatgpt2api.git
-# 首次启动会自动生成 config.json，也可以手动复制后修改
-# cp config.example.json config.json
-# 可按需编辑 config.json 的密钥和 `refresh_account_interval_minute`
+# 按需编辑 config.json 的密钥和 `refresh_account_interval_minute`
+# 也可以直接通过环境变量 CHATGPT2API_AUTH_KEY 覆盖 auth-key
 docker compose up -d
 ```
 

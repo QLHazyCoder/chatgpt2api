@@ -1,7 +1,6 @@
 from __future__ import annotations
 import json
 import os
-import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +9,6 @@ from typing import cast
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
 CONFIG_FILE = BASE_DIR / "config.json"
-CONFIG_EXAMPLE_FILE = BASE_DIR / "config.example.json"
 
 
 @dataclass(frozen=True)
@@ -44,35 +42,15 @@ def _load_json_object(path: Path, *, name: str) -> dict[str, object]:
     return loaded
 
 
-def _ensure_config_file() -> None:
-    """本地开发时，如果没有 config.json 就从 example 复制一份"""
-    if CONFIG_FILE.exists():
-        return
-    example_file = _readable_json_file(CONFIG_EXAMPLE_FILE, name="config.example.json")
-    if example_file is None:
-        return
-    shutil.copyfile(example_file, CONFIG_FILE)
-    print(f"✅ 已自动从 config.example.json 创建 {CONFIG_FILE}")
-
-
 def _load_settings() -> AppSettings:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    _ensure_config_file()
 
-    # 优先读取用户自己的 config.json（生产环境推荐）
+    # 优先使用环境变量，文件配置仅作为本地/自托管回退
     raw_config: dict[str, object] = {}
-    example_file = _readable_json_file(CONFIG_EXAMPLE_FILE, name="config.example.json")
-    if example_file is not None:
-        raw_config.update(_load_json_object(example_file, name="config.example.json"))
-
     config_file = _readable_json_file(CONFIG_FILE, name="config.json")
     if config_file is not None:
         raw_config.update(_load_json_object(config_file, name="config.json"))
 
-    # ==================== 关键修改部分 ====================
-    # 1. 优先使用环境变量（Render / Docker / 任何 PaaS 都推荐这样）
-    # 2. 再 fallback 到 config.json
-    # 3. 错误提示更清晰，不再误导说 “config.example.json”
     auth_key = str(
         os.getenv("CHATGPT2API_AUTH_KEY")
         or raw_config.get("auth-key")
@@ -90,7 +68,7 @@ def _load_settings() -> AppSettings:
         )
 
     refresh_account_interval_minute = cast(
-        int, raw_config.get("refresh_account_interval_minute", 5)
+        int, raw_config.get("refresh_account_interval_minute", 60)
     )
 
     return AppSettings(
