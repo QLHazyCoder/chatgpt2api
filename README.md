@@ -25,7 +25,7 @@
 已发布镜像支持 `linux/amd64` 与 `linux/arm64`，在 x86 服务器和 Apple Silicon / ARM Linux 设备上都会自动拉取匹配架构的版本。
 
 ```bash
-git clone git@github.com:basketikun/chatgpt2api.git
+git clone git@github.com:QLHazyCoder/chatgpt2api.git
 # 按需编辑 config.json 的密钥和 `refresh_account_interval_minute`
 # 也可以直接通过环境变量 CHATGPT2API_AUTH_KEY 覆盖 auth-key
 docker compose up -d
