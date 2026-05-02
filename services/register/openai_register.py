@@ -186,6 +186,39 @@ def wait_for_code(mailbox: dict) -> str | None:
     return mail_provider.wait_for_code(config["mail"], mailbox)
 
 
+def _normalize_email(value: str | None) -> str:
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    if "@" not in text or text.startswith("@") or text.endswith("@"):
+        return ""
+    return text
+
+
+def _as_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    text = str(value).strip().lower()
+    return text in {"1", "true", "yes", "y", "on"}
+
+
+def resolve_external_mailbox_plan() -> tuple[str, dict] | None:
+    mail_config = config.get("mail") if isinstance(config.get("mail"), dict) else {}
+    if not _as_bool(mail_config.get("use_external_email")):
+        return None
+    external_email = _normalize_email(mail_config.get("external_email"))
+    if not external_email:
+        return None
+    receive_mailbox = _normalize_email(mail_config.get("receive_mailbox")) or external_email
+    mailbox = {
+        "provider": "cloudflare_temp_email",
+        "address": receive_mailbox,
+    }
+    return external_email, mailbox
+
+
 class SentinelTokenGenerator:
     MAX_ATTEMPTS = 500000
     ERROR_PREFIX = "wQ8Lk5FbGpA2NcR9dShT6gYjU7VxZ4D"
@@ -565,12 +598,17 @@ class PlatformRegistrar:
         return tokens
 
     def register(self, index: int) -> dict:
-        step(index, "开始创建邮箱")
-        mailbox = create_mailbox()
-        email = str(mailbox.get("address") or "").strip()
-        if not email:
-            raise RuntimeError("邮箱服务未返回 address")
-        step(index, f"邮箱创建完成: {email}")
+        external_plan = resolve_external_mailbox_plan()
+        if external_plan:
+            email, mailbox = external_plan
+            step(index, f"使用外部邮箱注册: {email} (收件箱: {mailbox.get('address')})")
+        else:
+            step(index, "开始创建邮箱")
+            mailbox = create_mailbox()
+            email = str(mailbox.get("address") or "").strip()
+            if not email:
+                raise RuntimeError("邮箱服务未返回 address")
+            step(index, f"邮箱创建完成: {email}")
         password = _random_password()
         first_name, last_name = _random_name()
         self._platform_authorize(email, index)

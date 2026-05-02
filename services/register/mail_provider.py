@@ -224,9 +224,32 @@ class CloudflareTempMailProvider(BaseMailProvider):
             raise RuntimeError("CloudflareTempMail 缺少 address 或 jwt")
         return {"provider": self.name, "provider_ref": self.provider_ref, "address": address, "token": token}
 
+    @staticmethod
+    def _extract_mail_items(data: Any) -> list[dict[str, Any]]:
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+        if isinstance(data, dict):
+            for key in ("results", "items", "mails", "messages", "data"):
+                value = data.get(key)
+                if isinstance(value, list):
+                    return [item for item in value if isinstance(item, dict)]
+        return []
+
     def fetch_latest_message(self, mailbox: dict[str, Any]) -> dict[str, Any] | None:
-        data = self._request("GET", "/api/mails", headers={"Authorization": f"Bearer {mailbox['token']}"}, params={"limit": 10, "offset": 0})
-        raw = list(data.get("results") or []) if isinstance(data, dict) else data if isinstance(data, list) else []
+        token = str(mailbox.get("token") or "").strip()
+        address = str(mailbox.get("address") or "").strip()
+        if token:
+            data = self._request("GET", "/api/mails", headers={"Authorization": f"Bearer {token}"}, params={"limit": 10, "offset": 0})
+        else:
+            if not address:
+                raise RuntimeError("CloudflareTempMail 缺少 address")
+            data = self._request(
+                "GET",
+                "/admin/mails",
+                headers={"x-admin-auth": self.admin_password},
+                params={"limit": 10, "offset": 0, "address": address},
+            )
+        raw = self._extract_mail_items(data)
         messages = [item for item in raw if isinstance(item, dict) and _message_matches_email(item, str(mailbox.get("address") or ""))]
         if not messages:
             return None
